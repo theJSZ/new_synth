@@ -27,6 +27,8 @@ public:
     ~Voice();
     double tick();
     void setFrequency(double frequency);
+    void noteOn();
+    void noteOff();
 };
 
 #endif
