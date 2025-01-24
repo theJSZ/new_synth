@@ -1,29 +1,26 @@
 #include "voice.h"
+#include <stdio.h>
 
 void Voice::setFrequency(double frequency) {
-    this->saw->setFrequency(frequency);
-    this->square->setFrequency(frequency);
+    osc1->setBaseFrequency(frequency);
+    osc2->setBaseFrequency(frequency);
 }
 
-Voice::Voice()
-    : waveform(SAW)
+Voice::Voice(float samplerate)
 {
-    this->saw    = new stk::BlitSaw();
-    this->square = new stk::BlitSquare();
-    this->aeg    = new stk::ADSR();
-
+    std::cout << "creating voice\n";
+    osc1   = std::make_unique<Oscillator>();
+    osc2   = std::make_unique<Oscillator>();
+    filter = std::make_unique<OberheimVariationMoog>(samplerate);
+    aeg    = std::make_unique<stk::ADSR>();
+    feg    = std::make_unique<stk::ADSR>();
     this->setFrequency(220.0);
-    this->aeg->setAllTimes(0.01, 1.5, 0.0, 0.1);
-}
-
-Voice::~Voice() {
-    delete this->saw;
-    delete this->square;
-    delete this->aeg;
+    aeg->setAllTimes(0.01, 1.5, 0.0, 0.1);
+    feg->setAllTimes(0.01, 1.5, 0.0, 0.1);
 }
 
 double Voice::tick() {
-    return this->square->tick() * this->aeg->tick();
+    return (osc1->tick() + osc2->tick()) * aeg->tick() / 2;
 }
 
 void Voice::noteOn() {
@@ -47,4 +44,12 @@ void Voice::setAegSustain(float value) {
 }
 void Voice::setAegRelease(float value) {
     this->aeg->setReleaseTime(value);
+}
+
+void Voice::setOscDetune(int osc, float value) {
+    if (osc == 1) {
+        osc1->setDetune(value);
+    } else if (osc == 2) {
+        osc2->setDetune(value);
+    }
 }

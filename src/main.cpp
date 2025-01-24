@@ -10,6 +10,7 @@
 #include "imgui-knobs/imgui-knobs.h"
 #include "voice.h"
 #include "colors.h"
+#include "synthParameters.h"
 
 #include <cstdlib>
 #include <stdio.h>
@@ -107,41 +108,28 @@ int guiThread(Voice* voices[], int nVoices) {
         ImGui::NewFrame();
 
         // ImGui content
-        // ImGui::PushFont(font);
-
-        // ImGui::SetNextWindowSize(ImVec2(160, 480));
-
-        // ImGui::SetNextWindowPos(ImVec2(180, 10));
-
-        // ImGui::Begin("FEG", nullptr,
-        //     ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
-        //     ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar);
-
         ImGui::SetNextWindowPos(ImVec2(10, 10));
         ImGui::SetNextWindowSize(ImVec2(80, 480));
         ImGui::Begin("AEG", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize);
-            static float aegAttackTime = 0.001f;
-            static float aegDecayTime = 1.0f;
-            static float aegSustainLevel = 1.0f;
-            static float aegReleaseTime = 1.0f;
-            if (ImGuiKnobs::Knob("Attack", &aegAttackTime, 0.001f, 5.0f, 0.001f, "%.3fs", ImGuiKnobVariant_Tick)) {
+            static adsrParameters aeg = {0.001, 1.0, 1.0, 1.0};
+            if (ImGuiKnobs::Knob("Attack", &aeg.attackTime, 0.001f, 5.0f, 0.001f, "%.3fs", ImGuiKnobVariant_Tick)) {
                 for (int i = 0; i < nVoices; ++i) {
-                    voices[i]->setAegAttack(aegAttackTime);
+                    voices[i]->setAegAttack(aeg.attackTime);
                 }
             }
-            if (ImGuiKnobs::Knob("Decay", &aegDecayTime, 0.03f, 2.0f, 0.001f, "%.3fs", ImGuiKnobVariant_Tick, 0, ImGuiKnobFlags_Logarithmic)) {
+            if (ImGuiKnobs::Knob("Decay", &aeg.decayTime, 0.03f, 2.0f, 0.001f, "%.3fs", ImGuiKnobVariant_Tick, 0, ImGuiKnobFlags_Logarithmic)) {
                 for (int i = 0; i < nVoices; ++i) {
-                    voices[i]->setAegDecay(aegDecayTime);
+                    voices[i]->setAegDecay(aeg.decayTime);
                 }
             }
-            if (ImGuiKnobs::Knob("Sustain", &aegSustainLevel, 0.0f, 1.0f, 0.001f, "%.2fs", ImGuiKnobVariant_Tick)) {
+            if (ImGuiKnobs::Knob("Sustain", &aeg.sustainLevel, 0.0f, 1.0f, 0.001f, "%.2fs", ImGuiKnobVariant_Tick)) {
                 for (int i = 0; i < nVoices; ++i) {
-                    voices[i]->setAegSustain(aegSustainLevel);
+                    voices[i]->setAegSustain(aeg.sustainLevel);
                 }
             }
-            if (ImGuiKnobs::Knob("Release", &aegReleaseTime, 0.001f, 3.0f, 0.001f, "%.3fs", ImGuiKnobVariant_Tick, 0, ImGuiKnobFlags_Logarithmic)) {
+            if (ImGuiKnobs::Knob("Release", &aeg.releaseTime, 0.001f, 3.0f, 0.001f, "%.3fs", ImGuiKnobVariant_Tick, 0, ImGuiKnobFlags_Logarithmic)) {
                 for (int i = 0; i < nVoices; ++i) {
-                    voices[i]->setAegRelease(aegReleaseTime);
+                    voices[i]->setAegRelease(aeg.releaseTime);
                 }
             }
         ImGui::End();
@@ -149,28 +137,42 @@ int guiThread(Voice* voices[], int nVoices) {
         ImGui::SetNextWindowPos(ImVec2(100, 10));
         ImGui::SetNextWindowSize(ImVec2(80, 480));
         ImGui::Begin("FEG", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize);
-            static float fegAttackTime = 0.001f;
-            static float fegDecayTime = 1.0f;
-            static float fegSustainLevel = 1.0f;
-            static float fegReleaseTime = 1.0f;
-            if (ImGuiKnobs::Knob("Attack", &fegAttackTime, 0.001f, 5.0f, 0.001f, "%.3fs", ImGuiKnobVariant_Tick)) {
+            static adsrParameters feg = {0.001, 1.0, 1.0, 1.0};
+            if (ImGuiKnobs::Knob("Attack", &feg.attackTime, 0.001f, 5.0f, 0.001f, "%.3fs", ImGuiKnobVariant_Tick)) {
                 for (int i = 0; i < nVoices; ++i) {
-                    voices[i]->setAegAttack(fegAttackTime);
+                    voices[i]->setAegAttack(feg.attackTime);
                 }
             }
-            if (ImGuiKnobs::Knob("Decay", &fegDecayTime, 0.001f, 5.0f, 0.001f, "%.3fs", ImGuiKnobVariant_Tick)) {
+            if (ImGuiKnobs::Knob("Decay", &feg.decayTime, 0.001f, 5.0f, 0.001f, "%.3fs", ImGuiKnobVariant_Tick)) {
                 for (int i = 0; i < nVoices; ++i) {
-                    voices[i]->setAegDecay(fegDecayTime);
+                    voices[i]->setAegDecay(feg.decayTime);
                 }
             }
-            if (ImGuiKnobs::Knob("Sustain", &fegSustainLevel, 0.0f, 1.0f, 0.001f, "%.2fs", ImGuiKnobVariant_Tick)) {
+            if (ImGuiKnobs::Knob("Sustain", &feg.sustainLevel, 0.0f, 1.0f, 0.001f, "%.2fs", ImGuiKnobVariant_Tick)) {
                 for (int i = 0; i < nVoices; ++i) {
-                    voices[i]->setAegSustain(fegSustainLevel);
+                    voices[i]->setAegSustain(feg.sustainLevel);
                 }
             }
-            if (ImGuiKnobs::Knob("Release", &fegReleaseTime, 0.001f, 5.0f, 0.001f, "%.3fs", ImGuiKnobVariant_Tick)) {
+            if (ImGuiKnobs::Knob("Release", &feg.releaseTime, 0.001f, 5.0f, 0.001f, "%.3fs", ImGuiKnobVariant_Tick)) {
                 for (int i = 0; i < nVoices; ++i) {
-                    voices[i]->setAegRelease(fegReleaseTime);
+                    voices[i]->setAegRelease(feg.releaseTime);
+                }
+            }
+        ImGui::End();
+
+        ImGui::SetNextWindowPos(ImVec2(190, 10));
+        ImGui::SetNextWindowSize(ImVec2(80, 480));
+        ImGui::Begin("OSC", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize);
+            static float osc1detune = 1.0f;
+            static float osc2detune = 1.0f;
+            if (ImGuiKnobs::Knob("Osc 1 tune", &osc1detune, 1.0/1.05946f, 1.05946f, 0.0001f, "%.3fs", ImGuiKnobVariant_Tick)) {
+                for (int i = 0; i < nVoices; ++i) {
+                    voices[i]->setOscDetune(1, osc1detune);
+                }
+            }
+            if (ImGuiKnobs::Knob("Osc 2 tune", &osc2detune, 1.0/1.05946f, 1.05946f, 0.0001f, "%.3fs", ImGuiKnobVariant_Tick)) {
+                for (int i = 0; i < nVoices; ++i) {
+                    voices[i]->setOscDetune(2, osc2detune);
                 }
             }
         ImGui::End();
@@ -194,16 +196,11 @@ int guiThread(Voice* voices[], int nVoices) {
     SDL_DestroyWindow(window);
     SDL_Quit();
 
-    // clean up
-    SDL_DestroyWindow(window);
-    SDL_Quit();
-
     return 0;
 }
 
 void audioThread(Voice* voices[], int nVoices) {
-    Stk::setSampleRate( 44100.0 );
-    // Stk::showWarnings( true );
+    Stk::setSampleRate( SAMPLERATE );
 
     RtWvOut *dac = 0;
 
@@ -237,7 +234,7 @@ void audioThread(Voice* voices[], int nVoices) {
 
 int main()
 {
-    Voice *voice1 = new Voice;
+    Voice *voice1 = new Voice(SAMPLERATE);
     // Voice *voice2 = new Voice;
     // Voice *voice3 = new Voice;
     // Voice *voice4 = new Voice;

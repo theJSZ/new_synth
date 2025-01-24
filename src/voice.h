@@ -5,26 +5,21 @@
 #include "stk/BlitSquare.h"
 #include "stk/ADSR.h"
 #include <stdio.h>
-// #include "OberheimVariationModel.h"
-
-enum Waveform
-{
-    SAW,
-    SQUARE
-};
+#include "OberheimVariationModel.h"
+#include "oscillator.h"
+#include "memory"
 
 class Voice
 {
 private:
-    stk::BlitSaw *saw;
-    stk::BlitSquare *square;
-    Waveform waveform;
-    // OberheimVariationMoog *filter;
-    stk::ADSR *aeg;
-    // stk::ADSR *feg;
+    std::unique_ptr<Oscillator> osc1;
+    std::unique_ptr<Oscillator> osc2;
+    std::unique_ptr<OberheimVariationMoog> filter;
+    std::unique_ptr<stk::ADSR> aeg;
+    std::unique_ptr<stk::ADSR> feg;
 public:
-    Voice();
-    ~Voice();
+    Voice(float samplerate);
+    ~Voice() = default;
     double tick();
     void setFrequency(double frequency);
     void noteOn();
@@ -34,6 +29,8 @@ public:
     void setAegDecay(float value);
     void setAegSustain(float value);
     void setAegRelease(float value);
+
+    void setOscDetune(int osc, float value);
 };
 
 #endif
