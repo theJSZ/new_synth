@@ -29,6 +29,11 @@ public:
     void setFrequency(double frequency);
     void noteOn();
     void noteOff();
+
+    void setAegAttack(float value);
+    void setAegDecay(float value);
+    void setAegSustain(float value);
+    void setAegRelease(float value);
 };
 
 #endif

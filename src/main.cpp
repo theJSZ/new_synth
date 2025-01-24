@@ -7,7 +7,7 @@
 #include "imgui/imgui.h"
 #include "imgui/backends/imgui_impl_sdl2.h"
 #include "imgui/backends/imgui_impl_opengl3.h"
-
+#include "imgui-knobs/imgui-knobs.h"
 #include "voice.h"
 #include "colors.h"
 
@@ -17,6 +17,7 @@
 #include <atomic>
 #include <mutex>
 #include <condition_variable>
+
 
 const double SAMPLERATE = 44100.0;
 const int BUFFER_FRAMES = 64;
@@ -76,26 +77,13 @@ int guiThread(Voice* voices[], int nVoices) {
     ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
     ImGui_ImplOpenGL3_Init("#version 330");
 
-    // SDL_Renderer* renderer = SDL_CreateRenderer(
-    //     window,
-    //     -1,
-    //     SDL_RENDERER_ACCELERATED
-    // );
-    // if (renderer == nullptr) {
-    //     std::cerr << "SDL_CreateRenderer Error: " << SDL_GetError() << std::endl;
-    //     SDL_DestroyWindow(window);
-    //     SDL_Quit();
-    //     return 1;
-    // }
-
-    // setRenderColor(renderer, GRAY);
-
-
     SDL_Event event;
     // imgui main loop
     while (running.load()) {
         // Poll SDL events
         while (SDL_PollEvent(&event)) {
+            ImGui_ImplSDL2_ProcessEvent(&event);
+
             if (event.type == SDL_QUIT) {
                 running.store(false);
             }
@@ -121,23 +109,73 @@ int guiThread(Voice* voices[], int nVoices) {
         // ImGui content
         // ImGui::PushFont(font);
 
+        // ImGui::SetNextWindowSize(ImVec2(160, 480));
+
+        // ImGui::SetNextWindowPos(ImVec2(180, 10));
+
+        // ImGui::Begin("FEG", nullptr,
+        //     ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
+        //     ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar);
+
         ImGui::SetNextWindowPos(ImVec2(10, 10));
-        ImGui::SetNextWindowSize(ImVec2(160, 480));
-
-        ImGui::Begin("AEG", nullptr,
-            ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
-            ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar);
-        ImGui::Text("ADSR here");
+        ImGui::SetNextWindowSize(ImVec2(80, 480));
+        ImGui::Begin("AEG", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize);
+            static float aegAttackTime = 0.001f;
+            static float aegDecayTime = 1.0f;
+            static float aegSustainLevel = 1.0f;
+            static float aegReleaseTime = 1.0f;
+            if (ImGuiKnobs::Knob("Attack", &aegAttackTime, 0.001f, 5.0f, 0.001f, "%.3fs", ImGuiKnobVariant_Tick)) {
+                for (int i = 0; i < nVoices; ++i) {
+                    voices[i]->setAegAttack(aegAttackTime);
+                }
+            }
+            if (ImGuiKnobs::Knob("Decay", &aegDecayTime, 0.03f, 2.0f, 0.001f, "%.3fs", ImGuiKnobVariant_Tick, 0, ImGuiKnobFlags_Logarithmic)) {
+                for (int i = 0; i < nVoices; ++i) {
+                    voices[i]->setAegDecay(aegDecayTime);
+                }
+            }
+            if (ImGuiKnobs::Knob("Sustain", &aegSustainLevel, 0.0f, 1.0f, 0.001f, "%.2fs", ImGuiKnobVariant_Tick)) {
+                for (int i = 0; i < nVoices; ++i) {
+                    voices[i]->setAegSustain(aegSustainLevel);
+                }
+            }
+            if (ImGuiKnobs::Knob("Release", &aegReleaseTime, 0.001f, 3.0f, 0.001f, "%.3fs", ImGuiKnobVariant_Tick, 0, ImGuiKnobFlags_Logarithmic)) {
+                for (int i = 0; i < nVoices; ++i) {
+                    voices[i]->setAegRelease(aegReleaseTime);
+                }
+            }
         ImGui::End();
 
-        ImGui::SetNextWindowPos(ImVec2(180, 10));
-        ImGui::SetNextWindowSize(ImVec2(160, 480));
-
-        ImGui::Begin("FEG", nullptr,
-            ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
-            ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar);
-        ImGui::Text("ADSR here");
+        ImGui::SetNextWindowPos(ImVec2(100, 10));
+        ImGui::SetNextWindowSize(ImVec2(80, 480));
+        ImGui::Begin("FEG", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize);
+            static float fegAttackTime = 0.001f;
+            static float fegDecayTime = 1.0f;
+            static float fegSustainLevel = 1.0f;
+            static float fegReleaseTime = 1.0f;
+            if (ImGuiKnobs::Knob("Attack", &fegAttackTime, 0.001f, 5.0f, 0.001f, "%.3fs", ImGuiKnobVariant_Tick)) {
+                for (int i = 0; i < nVoices; ++i) {
+                    voices[i]->setAegAttack(fegAttackTime);
+                }
+            }
+            if (ImGuiKnobs::Knob("Decay", &fegDecayTime, 0.001f, 5.0f, 0.001f, "%.3fs", ImGuiKnobVariant_Tick)) {
+                for (int i = 0; i < nVoices; ++i) {
+                    voices[i]->setAegDecay(fegDecayTime);
+                }
+            }
+            if (ImGuiKnobs::Knob("Sustain", &fegSustainLevel, 0.0f, 1.0f, 0.001f, "%.2fs", ImGuiKnobVariant_Tick)) {
+                for (int i = 0; i < nVoices; ++i) {
+                    voices[i]->setAegSustain(fegSustainLevel);
+                }
+            }
+            if (ImGuiKnobs::Knob("Release", &fegReleaseTime, 0.001f, 5.0f, 0.001f, "%.3fs", ImGuiKnobVariant_Tick)) {
+                for (int i = 0; i < nVoices; ++i) {
+                    voices[i]->setAegRelease(fegReleaseTime);
+                }
+            }
         ImGui::End();
+
+
 
         // Rendering
         ImGui::Render();
@@ -156,39 +194,7 @@ int guiThread(Voice* voices[], int nVoices) {
     SDL_DestroyWindow(window);
     SDL_Quit();
 
-
-
-    // SDL main loop
-    // while (running.load()) {
-    //     while (SDL_PollEvent(&event)) {
-    //         if (event.type == SDL_QUIT) {
-    //             running.store(false);
-    //         }
-    //         else if (event.type == SDL_MOUSEBUTTONDOWN) {
-    //             int mouseX = event.motion.x;
-    //             for (int i = 0; i < nVoices; ++i) {
-    //                 voices[i]->setFrequency(static_cast<double>(mouseX));
-    //                 voices[i]->noteOn();
-    //             }
-    //         }
-    //         else if (event.type == SDL_MOUSEBUTTONUP) {
-    //             for (int i = 0; i < nVoices; ++i) {
-    //                 voices[i]->noteOff();
-    //             }
-    //         }
-    //     }
-
-    //     // fill window with selected color
-    //     SDL_RenderClear(renderer);
-    //     // update window
-    //     SDL_RenderPresent(renderer);
-    //     // wait 16ms for approx 60 fps
-    //     // SDL_Delay(16);
-
-    // }
-
     // clean up
-    // SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();
 
