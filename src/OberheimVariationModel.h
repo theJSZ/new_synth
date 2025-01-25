@@ -87,7 +87,7 @@ public:
 
 	virtual void Process(float * samples, uint32_t n) noexcept override
 	{
-		for (int s = 0; s < n; ++s)
+		for (unsigned int s = 0; s < n; ++s)
 		{
 			float input = samples[s];
 

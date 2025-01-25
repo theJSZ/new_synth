@@ -17,6 +17,8 @@ private:
     std::unique_ptr<OberheimVariationMoog> filter;
     std::unique_ptr<stk::ADSR> aeg;
     std::unique_ptr<stk::ADSR> feg;
+    float fegAmount;
+    float baseCutoff;
 public:
     Voice(float samplerate);
     ~Voice() = default;
@@ -30,7 +32,16 @@ public:
     void setAegSustain(float value);
     void setAegRelease(float value);
 
+    void setFegAttack(float value);
+    void setFegDecay(float value);
+    void setFegSustain(float value);
+    void setFegRelease(float value);
+
     void setOscDetune(int osc, float value);
+
+    void setCutoff(float value);
+    void setResonance(float value);
+    void setFegAmount(float value);
 };
 
 #endif

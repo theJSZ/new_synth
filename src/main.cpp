@@ -110,9 +110,9 @@ int guiThread(Voice* voices[], int nVoices) {
         // ImGui content
         ImGui::SetNextWindowPos(ImVec2(10, 10));
         ImGui::SetNextWindowSize(ImVec2(80, 480));
-        ImGui::Begin("AEG", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize);
+        ImGui::Begin("AEG", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoTitleBar);
             static adsrParameters aeg = {0.001, 1.0, 1.0, 1.0};
-            if (ImGuiKnobs::Knob("Attack", &aeg.attackTime, 0.001f, 5.0f, 0.001f, "%.3fs", ImGuiKnobVariant_Tick)) {
+            if (ImGuiKnobs::Knob("AEG\n\nAttack", &aeg.attackTime, 0.001f, 5.0f, 0.001f, "%.3fs", ImGuiKnobVariant_Tick)) {
                 for (int i = 0; i < nVoices; ++i) {
                     voices[i]->setAegAttack(aeg.attackTime);
                 }
@@ -122,7 +122,7 @@ int guiThread(Voice* voices[], int nVoices) {
                     voices[i]->setAegDecay(aeg.decayTime);
                 }
             }
-            if (ImGuiKnobs::Knob("Sustain", &aeg.sustainLevel, 0.0f, 1.0f, 0.001f, "%.2fs", ImGuiKnobVariant_Tick)) {
+            if (ImGuiKnobs::Knob("Sustain", &aeg.sustainLevel, 0.0f, 1.0f, 0.001f, "%.2f", ImGuiKnobVariant_Tick)) {
                 for (int i = 0; i < nVoices; ++i) {
                     voices[i]->setAegSustain(aeg.sustainLevel);
                 }
@@ -136,43 +136,73 @@ int guiThread(Voice* voices[], int nVoices) {
 
         ImGui::SetNextWindowPos(ImVec2(100, 10));
         ImGui::SetNextWindowSize(ImVec2(80, 480));
-        ImGui::Begin("FEG", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize);
+
+        // ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));  // Transparent background
+
+        ImGui::Begin("FEG", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoTitleBar);
             static adsrParameters feg = {0.001, 1.0, 1.0, 1.0};
-            if (ImGuiKnobs::Knob("Attack", &feg.attackTime, 0.001f, 5.0f, 0.001f, "%.3fs", ImGuiKnobVariant_Tick)) {
+            if (ImGuiKnobs::Knob("FEG\n\nAttack", &feg.attackTime, 0.001f, 5.0f, 0.001f, "%.3fs", ImGuiKnobVariant_Tick)) {
                 for (int i = 0; i < nVoices; ++i) {
-                    voices[i]->setAegAttack(feg.attackTime);
+                    voices[i]->setFegAttack(feg.attackTime);
                 }
             }
             if (ImGuiKnobs::Knob("Decay", &feg.decayTime, 0.001f, 5.0f, 0.001f, "%.3fs", ImGuiKnobVariant_Tick)) {
                 for (int i = 0; i < nVoices; ++i) {
-                    voices[i]->setAegDecay(feg.decayTime);
+                    voices[i]->setFegDecay(feg.decayTime);
                 }
             }
-            if (ImGuiKnobs::Knob("Sustain", &feg.sustainLevel, 0.0f, 1.0f, 0.001f, "%.2fs", ImGuiKnobVariant_Tick)) {
+            if (ImGuiKnobs::Knob("Sustain", &feg.sustainLevel, 0.0f, 1.0f, 0.001f, "%.2f", ImGuiKnobVariant_Tick)) {
                 for (int i = 0; i < nVoices; ++i) {
-                    voices[i]->setAegSustain(feg.sustainLevel);
+                    voices[i]->setFegSustain(feg.sustainLevel);
                 }
             }
             if (ImGuiKnobs::Knob("Release", &feg.releaseTime, 0.001f, 5.0f, 0.001f, "%.3fs", ImGuiKnobVariant_Tick)) {
                 for (int i = 0; i < nVoices; ++i) {
-                    voices[i]->setAegRelease(feg.releaseTime);
+                    voices[i]->setFegRelease(feg.releaseTime);
                 }
             }
         ImGui::End();
 
+        // ImGui::PopStyleColor(); // Restore the previous style color
+
+
         ImGui::SetNextWindowPos(ImVec2(190, 10));
         ImGui::SetNextWindowSize(ImVec2(80, 480));
-        ImGui::Begin("OSC", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize);
+        ImGui::Begin("OSC", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoTitleBar);
             static float osc1detune = 1.0f;
             static float osc2detune = 1.0f;
-            if (ImGuiKnobs::Knob("Osc 1 tune", &osc1detune, 1.0/1.05946f, 1.05946f, 0.0001f, "%.3fs", ImGuiKnobVariant_Tick)) {
+            if (ImGuiKnobs::Knob("Osc 1 tune", &osc1detune, 1.0/1.05946f, 1.05946f, 0.0001f, "%.3f", ImGuiKnobVariant_Tick)) {
                 for (int i = 0; i < nVoices; ++i) {
                     voices[i]->setOscDetune(1, osc1detune);
                 }
             }
-            if (ImGuiKnobs::Knob("Osc 2 tune", &osc2detune, 1.0/1.05946f, 1.05946f, 0.0001f, "%.3fs", ImGuiKnobVariant_Tick)) {
+            if (ImGuiKnobs::Knob("Osc 2 tune", &osc2detune, 1.0/1.05946f, 1.05946f, 0.0001f, "%.3f", ImGuiKnobVariant_Tick)) {
                 for (int i = 0; i < nVoices; ++i) {
                     voices[i]->setOscDetune(2, osc2detune);
+                }
+            }
+        ImGui::End();
+
+
+        ImGui::SetNextWindowPos(ImVec2(280, 10));
+        ImGui::SetNextWindowSize(ImVec2(80, 480));
+        ImGui::Begin("Filter", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoTitleBar);
+            static float cutoff = 1000.0f;
+            static float resonance = 0.0f;
+            static float fegAmount = 0.0f;
+            if (ImGuiKnobs::Knob("Cutoff", &cutoff, 0.1f, 1000.0f, 0.1f, "%.1f", ImGuiKnobVariant_Tick)) {
+                for (int i = 0; i < nVoices; ++i) {
+                    voices[i]->setCutoff(cutoff);
+                }
+            }
+            if (ImGuiKnobs::Knob("Resonance", &resonance, 0.1f, 10.0f, 0.001f, "%.3f", ImGuiKnobVariant_Tick)) {
+                for (int i = 0; i < nVoices; ++i) {
+                    voices[i]->setResonance(resonance);
+                }
+            }
+            if (ImGuiKnobs::Knob("FEG Amount", &fegAmount, 0.0f, 1000.0f, 0.1f, "%.2f", ImGuiKnobVariant_Tick)) {
+                for (int i = 0; i < nVoices; ++i) {
+                    voices[i]->setFegAmount(fegAmount);
                 }
             }
         ImGui::End();

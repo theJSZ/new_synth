@@ -20,30 +20,50 @@ Voice::Voice(float samplerate)
 }
 
 double Voice::tick() {
-    return (osc1->tick() + osc2->tick()) * aeg->tick() / 2;
+    float sample = (osc1->tick() + osc2->tick()) / 2;
+    filter->SetCutoff(baseCutoff + (feg->tick() * fegAmount));
+    filter->Process(&sample, 1);
+    return (double) sample * aeg->tick();
 }
 
 void Voice::noteOn() {
-    this->aeg->keyOn();
+    aeg->keyOn();
+    feg->keyOn();
 }
 
 void Voice::noteOff() {
-    this->aeg->keyOff();
+    aeg->keyOff();
+    feg->keyOff();
 }
 
 
 // AEG
 void Voice::setAegAttack(float value) {
-    this->aeg->setAttackTime(value);
+    aeg->setAttackTime(value);
 }
 void Voice::setAegDecay(float value) {
-    this->aeg->setDecayTime(value);
+    aeg->setDecayTime(value);
 }
 void Voice::setAegSustain(float value) {
-    this->aeg->setSustainLevel(value);
+    aeg->setSustainLevel(value);
 }
 void Voice::setAegRelease(float value) {
-    this->aeg->setReleaseTime(value);
+    aeg->setReleaseTime(value);
+}
+
+
+// FEG
+void Voice::setFegAttack(float value) {
+    feg->setAttackTime(value);
+}
+void Voice::setFegDecay(float value) {
+    feg->setDecayTime(value);
+}
+void Voice::setFegSustain(float value) {
+    feg->setSustainLevel(value);
+}
+void Voice::setFegRelease(float value) {
+    feg->setReleaseTime(value);
 }
 
 void Voice::setOscDetune(int osc, float value) {
@@ -52,4 +72,16 @@ void Voice::setOscDetune(int osc, float value) {
     } else if (osc == 2) {
         osc2->setDetune(value);
     }
+}
+
+
+// FILTER
+void Voice::setCutoff(float value) {
+    baseCutoff = value;
+}
+void Voice::setResonance(float value) {
+    filter->SetResonance(value);
+}
+void Voice::setFegAmount(float value) {
+    fegAmount = value;
 }
