@@ -21,7 +21,7 @@ else
 endif
 
 # Source files
-SOURCES = main.cpp voice.cpp imgui/*.cpp imgui/backends/imgui_impl_sdl2.cpp imgui/backends/imgui_impl_opengl3.cpp imgui-knobs/imgui-knobs.cpp oscillator.cpp
+SOURCES = main.cpp voice.cpp imgui/*.cpp imgui/backends/imgui_impl_sdl2.cpp imgui/backends/imgui_impl_opengl3.cpp imgui-knobs/imgui-knobs.cpp oscillator.cpp voiceAllocator.cpp
 
 
 # Build target

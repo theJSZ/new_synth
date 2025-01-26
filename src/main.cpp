@@ -9,8 +9,10 @@
 #include "imgui/backends/imgui_impl_opengl3.h"
 #include "imgui-knobs/imgui-knobs.h"
 #include "toggleSwitch.h"
+#include "imageLoading.h"
 
 #include "voice.h"
+#include "voiceAllocator.h"
 #include "colors.h"
 
 #include <cstdlib>
@@ -29,6 +31,7 @@ const int WINDOW_HEIGHT = 600;
 std::atomic<bool> running(true); // flag that is shared across threads
 
 using namespace stk;
+
 
 void inline setRenderColor(SDL_Renderer* renderer, SDL_Color color) {
     SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
@@ -83,10 +86,12 @@ void initializeImGui(SDLContext& sdlContext) {
     ImGui_ImplOpenGL3_Init("#version 330");
 }
 
+const float KNOBSIZE = 40.0f;
+
 template <typename UpdateFunc>
 void createKnob(const char* label, float* value, float min, float max, float step, const char* format,
                 UpdateFunc updateFunc) {
-    if (ImGuiKnobs::Knob(label, value, min, max, step, format, ImGuiKnobVariant_Tick)) {
+    if (ImGuiKnobs::Knob(label, value, min, max, step, "", ImGuiKnobVariant_Wiper, KNOBSIZE, ImGuiKnobFlags_NoInput | ImGuiKnobFlags_NoTitle)) {
         updateFunc(*value);
     }
 }
@@ -98,8 +103,100 @@ struct adsrParameters {
     float releaseTime;
 };
 
+void renderUi(Voice* voices[], int nVoices) {
+
+    ImGui::SetNextWindowPos(ImVec2(0,0));
+    ImGui::SetNextWindowSize(ImVec2(800,600));
+    ImGui::Begin("UI", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoBackground);
+
+    // OSC SECTION
+    static float osc1detune = 1.0f;
+    static float osc2detune = 1.0f;
+    static bool toggle_value1 = false;
+    static bool toggle_value2 = false;
+    ImGui::SetCursorPos(ImVec2(70, 108));
+    createKnob("Osc1 tune", &osc1detune, 1.0/1.05946f, 1.05946f, 0.0001f, "%.3f", [&](float v) {
+        for (int i = 0; i < nVoices; ++i) voices[i]->setOscDetune(1, v);
+    });
+    ImGui::SetCursorPos(ImVec2(71, 162));
+    createKnob("Osc2 tune", &osc2detune, 1.0/1.05946f, 1.05946f, 0.0001f, "%.3f", [&](float v) {
+        for (int i = 0; i < nVoices; ++i) voices[i]->setOscDetune(2, v);
+    });
+    ImGui::SetCursorPos(ImVec2(173, 127));
+    if (ToggleSwitch("Toggle1", &toggle_value1)) {
+        for (int i = 0; i < nVoices; ++i) {
+            voices[i]->toggleOscWaveform(1, toggle_value1);
+        }
+    }
+    ImGui::SetCursorPos(ImVec2(173, 182));
+    if (ToggleSwitch("Toggle2", &toggle_value2)) {
+        for (int i = 0; i < nVoices; ++i) {
+            voices[i]->toggleOscWaveform(2, toggle_value2);
+        }
+    }
+
+    // FILTER SECTION
+    static float cutoff = 1000.0f;
+    static float resonance = 0.0f;
+    static float fegAmount = 0.0f;
+    ImGui::SetCursorPos(ImVec2(447, 128));
+    createKnob("Cutoff", &cutoff, 0.1f, 1000.0f, 0.1f, "%.1f", [&](float v) {
+        for (int i = 0; i < nVoices; ++i) voices[i]->setCutoff(v);
+    });
+    ImGui::SetCursorPos(ImVec2(525, 125));
+    createKnob("Resonance", &resonance, 0.1f, 10.0f, 0.001f, "%.3f", [&](float v) {
+        for (int i = 0; i < nVoices; ++i) voices[i]->setResonance(v);
+    });
+    ImGui::SetCursorPos(ImVec2(598, 118));
+    createKnob("FEG Amount", &fegAmount, 0.0f, 1000.0f, 0.1f, "%.2f", [&](float v) {
+        for (int i = 0; i < nVoices; ++i) voices[i]->setFegAmount(fegAmount);
+    });
+
+    // AEG
+    static adsrParameters aeg = {0.001, 1.0, 1.0, 1.0};
+    ImGui::SetCursorPos(ImVec2(123, 303));
+    createKnob("aegAttack", &aeg.attackTime, 0.001f, 5.0f, 0.001f, "%.3fs", [&](float v) {
+        for (int i = 0; i < nVoices; ++i) voices[i]->setAegAttack(v);
+    });
+    ImGui::SetCursorPos(ImVec2(182, 299));
+    createKnob("aegDecay", &aeg.decayTime, 0.03f, 2.0f, 0.001f, "%.3fs", [&](float v) {
+        for (int i = 0; i < nVoices; ++i) voices[i]->setAegDecay(v);
+    });
+    ImGui::SetCursorPos(ImVec2(237, 291));
+    createKnob("aegSustain", &aeg.sustainLevel, 0.0f, 1.0f, 0.001f, "%.2f", [&](float v) {
+        for (int i = 0; i < nVoices; ++i) voices[i]->setAegSustain(v);
+    });
+    ImGui::SetCursorPos(ImVec2(294, 297));
+    createKnob("aegRelease", &aeg.releaseTime, 0.001f, 3.0f, 0.001f, "%.3fs", [&](float v) {
+        for (int i = 0; i < nVoices; ++i) voices[i]->setAegRelease(v);
+    });
+
+    // FEG
+    static adsrParameters feg = {0.001, 1.0, 1.0, 1.0};
+    ImGui::SetCursorPos(ImVec2(124, 372));
+    createKnob("fegAttack", &feg.attackTime, 0.001f, 5.0f, 0.001f, "%.3fs", [&](float v) {
+        for (int i = 0; i < nVoices; ++i) voices[i]->setFegAttack(v);
+    });
+    ImGui::SetCursorPos(ImVec2(184, 372));
+    createKnob("fegDecay", &feg.decayTime, 0.03f, 2.0f, 0.001f, "%.3fs", [&](float v) {
+        for (int i = 0; i < nVoices; ++i) voices[i]->setFegDecay(v);
+    });
+    ImGui::SetCursorPos(ImVec2(240, 362));
+    createKnob("fegSustain", &feg.sustainLevel, 0.0f, 1.0f, 0.001f, "%.2f", [&](float v) {
+        for (int i = 0; i < nVoices; ++i) voices[i]->setFegSustain(v);
+    });
+    ImGui::SetCursorPos(ImVec2(291, 364));
+    createKnob("fegRelease", &feg.releaseTime, 0.001f, 3.0f, 0.001f, "%.3fs", [&](float v) {
+        for (int i = 0; i < nVoices; ++i) voices[i]->setFegRelease(v);
+    });
+
+    ImGui::End();
+
+}
+
 void renderAEG(Voice* voices[], int nVoices) {
     static adsrParameters aeg = {0.001, 1.0, 1.0, 1.0};
+
     ImGui::Begin("AEG", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoBackground);
     createKnob("Attack", &aeg.attackTime, 0.001f, 5.0f, 0.001f, "%.3fs", [&](float v) {
         for (int i = 0; i < nVoices; ++i) voices[i]->setAegAttack(v);
@@ -139,19 +236,25 @@ void renderOscSection(Voice* voices[], int nVoices) {
     static float osc2detune = 1.0f;
     static bool toggle_value1 = false;
     static bool toggle_value2 = false;
+    ImGui::SetNextWindowPos(ImVec2(0, 0));
+    ImGui::SetNextWindowSize(ImVec2(800, 600));
     ImGui::Begin("Osc", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoBackground);
+    ImGui::SetCursorPos(ImVec2(70, 108));
     createKnob("Osc1 tune", &osc1detune, 1.0/1.05946f, 1.05946f, 0.0001f, "%.3f", [&](float v) {
         for (int i = 0; i < nVoices; ++i) voices[i]->setOscDetune(1, v);
     });
+    ImGui::SetCursorPos(ImVec2(71, 162));
     createKnob("Osc2 tune", &osc2detune, 1.0/1.05946f, 1.05946f, 0.0001f, "%.3f", [&](float v) {
         for (int i = 0; i < nVoices; ++i) voices[i]->setOscDetune(2, v);
     });
+    ImGui::SetCursorPos(ImVec2(173, 127));
     if (ToggleSwitch("Toggle1", &toggle_value1))
         {
             for (int i = 0; i < nVoices; ++i) {
                 voices[i]->toggleOscWaveform(1, toggle_value1);
             }
         }
+    ImGui::SetCursorPos(ImVec2(173, 182));
     if (ToggleSwitch("Toggle2", &toggle_value2))
         {
             for (int i = 0; i < nVoices; ++i) {
@@ -165,13 +268,18 @@ void renderFilterSection(Voice* voices[], int nVoices) {
     static float cutoff = 1000.0f;
     static float resonance = 0.0f;
     static float fegAmount = 0.0f;
+    ImGui::SetNextWindowPos(ImVec2(0, 0));
+    ImGui::SetNextWindowSize(ImVec2(800, 600));
     ImGui::Begin("Filter", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoBackground);
+    ImGui::SetCursorPos(ImVec2(447, 128));
     createKnob("Cutoff", &cutoff, 0.1f, 1000.0f, 0.1f, "%.1f", [&](float v) {
         for (int i = 0; i < nVoices; ++i) voices[i]->setCutoff(v);
     });
+    ImGui::SetCursorPos(ImVec2(525, 125));
     createKnob("Resonance", &resonance, 0.1f, 10.0f, 0.001f, "%.3f", [&](float v) {
         for (int i = 0; i < nVoices; ++i) voices[i]->setResonance(v);
     });
+    ImGui::SetCursorPos(ImVec2(598, 118));
     createKnob("FEG Amount", &fegAmount, 0.0f, 1000.0f, 0.1f, "%.2f", [&](float v) {
         for (int i = 0; i < nVoices; ++i) voices[i]->setFegAmount(fegAmount);
     });
@@ -179,10 +287,16 @@ void renderFilterSection(Voice* voices[], int nVoices) {
 }
 
 
-int guiThread(Voice* voices[], int nVoices) {
+int guiThread(Voice* voices[], int nVoices, voiceAllocator* allocator) {
     SDLContext sdlContext;
     if (!initializeSDL(sdlContext)) return 1;
     initializeImGui(sdlContext);
+
+    int my_image_width = 0;
+    int my_image_height = 0;
+    GLuint my_image_texture = 0;
+    bool ret = LoadTextureFromFile("../assets/ui_v0.jpg", &my_image_texture, &my_image_width, &my_image_height);
+    IM_ASSERT(ret);
 
     SDL_Event event;
     // imgui main loop
@@ -195,15 +309,18 @@ int guiThread(Voice* voices[], int nVoices) {
             }
             else if (event.type == SDL_MOUSEBUTTONDOWN) {
                 int mouseX = event.motion.x;
-                for (int i = 0; i < nVoices; ++i) {
-                    voices[i]->setFrequency(static_cast<double>(mouseX));
-                    voices[i]->noteOn();
-                }
+                // for (int i = 0; i < nVoices; ++i) {
+                    allocator->noteOn(static_cast<double>(mouseX));
+                    // voices[i]->setFrequency(static_cast<double>(mouseX));
+                    // voices[i]->noteOn();
+                // }
             }
             else if (event.type == SDL_MOUSEBUTTONUP) {
-                for (int i = 0; i < nVoices; ++i) {
-                    voices[i]->noteOff();
-                }
+                int mouseX = event.motion.x;
+                // for (int i = 0; i < nVoices; ++i) {
+                allocator->noteOff(static_cast<double>(mouseX));
+                    // voices[i]->noteOff();
+                // }
             }
         }
 
@@ -212,11 +329,25 @@ int guiThread(Voice* voices[], int nVoices) {
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
 
+        ImGui::SetNextWindowPos(ImVec2(0,0));
+        ImGui::Begin("OpenGL Texture Text", nullptr,
+            ImGuiWindowFlags_NoCollapse |
+            ImGuiWindowFlags_NoResize |
+            ImGuiWindowFlags_NoMove |
+            ImGuiWindowFlags_NoTitleBar |
+            ImGuiWindowFlags_NoBringToFrontOnFocus);
+        ImGui::Image((ImTextureID)(intptr_t)my_image_texture, ImVec2(my_image_width, my_image_height));
+        ImGui::End();
+
         // Render UI elements
-        renderAEG(voices, nVoices);
-        renderFEG(voices, nVoices);
-        renderOscSection(voices, nVoices);
-        renderFilterSection(voices, nVoices);
+        ImGuiStyle& style = ImGui::GetStyle();
+        style.Colors[ImGuiCol_ButtonActive] = ImVec4(0.2f, 0.2f, 0.2f, 1.0f);
+
+        renderUi(voices, nVoices);
+        // renderAEG(voices, nVoices);
+        // renderFEG(voices, nVoices);
+        // renderOscSection(voices, nVoices);
+        // renderFilterSection(voices, nVoices);
 
         // Rendering
         ImGui::Render();
@@ -273,10 +404,18 @@ void audioThread(Voice* voices[], int nVoices) {
 int main()
 {
     Voice* voice1 = new Voice(SAMPLERATE);
-    Voice* voices[] = {voice1};
+    Voice* voice2 = new Voice(SAMPLERATE);
+    Voice* voice3 = new Voice(SAMPLERATE);
+    Voice* voice4 = new Voice(SAMPLERATE);
+    Voice* voice5 = new Voice(SAMPLERATE);
+    Voice* voice6 = new Voice(SAMPLERATE);
+    Voice* voice7 = new Voice(SAMPLERATE);
+    Voice* voice8 = new Voice(SAMPLERATE);
+    Voice* voices[] = {voice1, voice2, voice3, voice4, voice5, voice6, voice7, voice8};
+    voiceAllocator* allocator = new voiceAllocator(voices, sizeof(voices)/sizeof(voices[0]));
 
     std::thread audio(audioThread, voices, sizeof(voices)/sizeof(voices[0]));
-    std::thread gui(guiThread, voices, sizeof(voices)/sizeof(voices[0]));
+    std::thread gui(guiThread, voices, sizeof(voices)/sizeof(voices[0]), allocator);
 
     gui.join();
     running.store(false);
