@@ -12,7 +12,6 @@
 
 #include "voice.h"
 #include "colors.h"
-#include "synthParameters.h"
 
 #include <cstdlib>
 #include <stdio.h>
@@ -24,6 +23,8 @@
 
 const double SAMPLERATE = 48000.0;
 const int BUFFER_FRAMES = 64;
+const int WINDOW_WIDTH = 800;
+const int WINDOW_HEIGHT = 600;
 
 std::atomic<bool> running(true); // flag that is shared across threads
 
@@ -33,52 +34,155 @@ void inline setRenderColor(SDL_Renderer* renderer, SDL_Color color) {
     SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
 }
 
-int guiThread(Voice* voices[], int nVoices) {
-    // Initialize SDL
+struct SDLContext {
+    SDL_Window* window = nullptr;
+    SDL_GLContext glContext = nullptr;
+
+    ~SDLContext() {
+        if (glContext) SDL_GL_DeleteContext(glContext);
+        if (window) SDL_DestroyWindow(window);
+        SDL_Quit();
+    }
+};
+
+bool initializeSDL(SDLContext& sdlContext) {
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         std::cerr << "SDL_Init Error: " << SDL_GetError() << std::endl;
-        return 1;
+        return false;
     }
 
-     // Setup SDL OpenGL attributes
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
 
-    // Create window
-    SDL_Window* window = SDL_CreateWindow(
-        "Synthesizer",
-        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, // x and y position
-        800, 600,                                       // width and height
-        SDL_WINDOW_OPENGL
-    );
-
-    if (window == nullptr) {
+    sdlContext.window = SDL_CreateWindow("Synthesizer", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+                                         WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_OPENGL);
+    if (!sdlContext.window) {
         std::cerr << "SDL_CreateWindow Error: " << SDL_GetError() << std::endl;
-        SDL_Quit();
-        return 1;
+        return false;
     }
 
-    SDL_GLContext gl_context = SDL_GL_CreateContext(window);
-    SDL_GL_MakeCurrent(window, gl_context);
-    SDL_GL_SetSwapInterval(1); // Enable vsync
+    sdlContext.glContext = SDL_GL_CreateContext(sdlContext.window);
+    SDL_GL_MakeCurrent(sdlContext.window, sdlContext.glContext);
+    SDL_GL_SetSwapInterval(1);
 
-    // Initialize GLEW
     if (glewInit() != GLEW_OK) {
-        printf("Failed to initialize GLEW\n");
-        return -1;
+        std::cerr << "Failed to initialize GLEW" << std::endl;
+        return false;
     }
 
-    // Setup Dear ImGui context
+    return true;
+}
+
+void initializeImGui(SDLContext& sdlContext) {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
-    ImGui::StyleColorsDark(); // Set the UI style to dark
-
-    // Setup Platform/Renderer bindings
-    ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
+    ImGui::StyleColorsDark();
+    ImGui_ImplSDL2_InitForOpenGL(sdlContext.window, sdlContext.glContext);
     ImGui_ImplOpenGL3_Init("#version 330");
+}
+
+template <typename UpdateFunc>
+void createKnob(const char* label, float* value, float min, float max, float step, const char* format,
+                UpdateFunc updateFunc) {
+    if (ImGuiKnobs::Knob(label, value, min, max, step, format, ImGuiKnobVariant_Tick)) {
+        updateFunc(*value);
+    }
+}
+
+struct adsrParameters {
+    float attackTime;
+    float decayTime;
+    float sustainLevel;
+    float releaseTime;
+};
+
+void renderAEG(Voice* voices[], int nVoices) {
+    static adsrParameters aeg = {0.001, 1.0, 1.0, 1.0};
+    ImGui::Begin("AEG", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoBackground);
+    createKnob("Attack", &aeg.attackTime, 0.001f, 5.0f, 0.001f, "%.3fs", [&](float v) {
+        for (int i = 0; i < nVoices; ++i) voices[i]->setAegAttack(v);
+    });
+    createKnob("Decay", &aeg.decayTime, 0.03f, 2.0f, 0.001f, "%.3fs", [&](float v) {
+        for (int i = 0; i < nVoices; ++i) voices[i]->setAegDecay(v);
+    });
+    createKnob("Sustain", &aeg.sustainLevel, 0.0f, 1.0f, 0.001f, "%.2f", [&](float v) {
+        for (int i = 0; i < nVoices; ++i) voices[i]->setAegSustain(v);
+    });
+    createKnob("Release", &aeg.releaseTime, 0.001f, 3.0f, 0.001f, "%.3fs", [&](float v) {
+        for (int i = 0; i < nVoices; ++i) voices[i]->setAegRelease(v);
+    });
+    ImGui::End();
+}
+
+void renderFEG(Voice* voices[], int nVoices) {
+    static adsrParameters feg = {0.001, 1.0, 1.0, 1.0};
+    ImGui::Begin("FEG", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoBackground);
+    createKnob("Attack", &feg.attackTime, 0.001f, 5.0f, 0.001f, "%.3fs", [&](float v) {
+        for (int i = 0; i < nVoices; ++i) voices[i]->setFegAttack(v);
+    });
+    createKnob("Decay", &feg.decayTime, 0.03f, 2.0f, 0.001f, "%.3fs", [&](float v) {
+        for (int i = 0; i < nVoices; ++i) voices[i]->setFegDecay(v);
+    });
+    createKnob("Sustain", &feg.sustainLevel, 0.0f, 1.0f, 0.001f, "%.2f", [&](float v) {
+        for (int i = 0; i < nVoices; ++i) voices[i]->setFegSustain(v);
+    });
+    createKnob("Release", &feg.releaseTime, 0.001f, 3.0f, 0.001f, "%.3fs", [&](float v) {
+        for (int i = 0; i < nVoices; ++i) voices[i]->setFegRelease(v);
+    });
+    ImGui::End();
+}
+
+void renderOscSection(Voice* voices[], int nVoices) {
+    static float osc1detune = 1.0f;
+    static float osc2detune = 1.0f;
+    static bool toggle_value1 = false;
+    static bool toggle_value2 = false;
+    ImGui::Begin("Osc", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoBackground);
+    createKnob("Osc1 tune", &osc1detune, 1.0/1.05946f, 1.05946f, 0.0001f, "%.3f", [&](float v) {
+        for (int i = 0; i < nVoices; ++i) voices[i]->setOscDetune(1, v);
+    });
+    createKnob("Osc2 tune", &osc2detune, 1.0/1.05946f, 1.05946f, 0.0001f, "%.3f", [&](float v) {
+        for (int i = 0; i < nVoices; ++i) voices[i]->setOscDetune(2, v);
+    });
+    if (ToggleSwitch("Toggle1", &toggle_value1))
+        {
+            for (int i = 0; i < nVoices; ++i) {
+                voices[i]->toggleOscWaveform(1, toggle_value1);
+            }
+        }
+    if (ToggleSwitch("Toggle2", &toggle_value2))
+        {
+            for (int i = 0; i < nVoices; ++i) {
+                voices[i]->toggleOscWaveform(2, toggle_value2);
+            }
+        }
+    ImGui::End();
+}
+
+void renderFilterSection(Voice* voices[], int nVoices) {
+    static float cutoff = 1000.0f;
+    static float resonance = 0.0f;
+    static float fegAmount = 0.0f;
+    ImGui::Begin("Filter", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoBackground);
+    createKnob("Cutoff", &cutoff, 0.1f, 1000.0f, 0.1f, "%.1f", [&](float v) {
+        for (int i = 0; i < nVoices; ++i) voices[i]->setCutoff(v);
+    });
+    createKnob("Resonance", &resonance, 0.1f, 10.0f, 0.001f, "%.3f", [&](float v) {
+        for (int i = 0; i < nVoices; ++i) voices[i]->setResonance(v);
+    });
+    createKnob("FEG Amount", &fegAmount, 0.0f, 1000.0f, 0.1f, "%.2f", [&](float v) {
+        for (int i = 0; i < nVoices; ++i) voices[i]->setFegAmount(fegAmount);
+    });
+    ImGui::End();
+}
+
+
+int guiThread(Voice* voices[], int nVoices) {
+    SDLContext sdlContext;
+    if (!initializeSDL(sdlContext)) return 1;
+    initializeImGui(sdlContext);
 
     SDL_Event event;
     // imgui main loop
@@ -86,7 +190,6 @@ int guiThread(Voice* voices[], int nVoices) {
         // Poll SDL events
         while (SDL_PollEvent(&event)) {
             ImGui_ImplSDL2_ProcessEvent(&event);
-
             if (event.type == SDL_QUIT) {
                 running.store(false);
             }
@@ -109,146 +212,34 @@ int guiThread(Voice* voices[], int nVoices) {
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
 
-        // ImGui content
-        ImGui::SetNextWindowPos(ImVec2(10, 10));
-        ImGui::SetNextWindowSize(ImVec2(80, 480));
-        ImGui::Begin("AEG", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoTitleBar);
-            static adsrParameters aeg = {0.001, 1.0, 1.0, 1.0};
-            if (ImGuiKnobs::Knob("AEG\n\nAttack", &aeg.attackTime, 0.001f, 5.0f, 0.001f, "%.3fs", ImGuiKnobVariant_Tick)) {
-                for (int i = 0; i < nVoices; ++i) {
-                    voices[i]->setAegAttack(aeg.attackTime);
-                }
-            }
-            if (ImGuiKnobs::Knob("Decay", &aeg.decayTime, 0.03f, 2.0f, 0.001f, "%.3fs", ImGuiKnobVariant_Tick, 0, ImGuiKnobFlags_Logarithmic)) {
-                for (int i = 0; i < nVoices; ++i) {
-                    voices[i]->setAegDecay(aeg.decayTime);
-                }
-            }
-            if (ImGuiKnobs::Knob("Sustain", &aeg.sustainLevel, 0.0f, 1.0f, 0.001f, "%.2f", ImGuiKnobVariant_Tick)) {
-                for (int i = 0; i < nVoices; ++i) {
-                    voices[i]->setAegSustain(aeg.sustainLevel);
-                }
-            }
-            if (ImGuiKnobs::Knob("Release", &aeg.releaseTime, 0.001f, 3.0f, 0.001f, "%.3fs", ImGuiKnobVariant_Tick, 0, ImGuiKnobFlags_Logarithmic)) {
-                for (int i = 0; i < nVoices; ++i) {
-                    voices[i]->setAegRelease(aeg.releaseTime);
-                }
-            }
-        ImGui::End();
-
-        ImGui::SetNextWindowPos(ImVec2(100, 10));
-        ImGui::SetNextWindowSize(ImVec2(80, 480));
-
-        ImGui::Begin("FEG", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoTitleBar);
-            static adsrParameters feg = {0.001, 1.0, 1.0, 1.0};
-            if (ImGuiKnobs::Knob("FEG\n\nAttack", &feg.attackTime, 0.001f, 5.0f, 0.001f, "%.3fs", ImGuiKnobVariant_Tick)) {
-                for (int i = 0; i < nVoices; ++i) {
-                    voices[i]->setFegAttack(feg.attackTime);
-                }
-            }
-            if (ImGuiKnobs::Knob("Decay", &feg.decayTime, 0.001f, 5.0f, 0.001f, "%.3fs", ImGuiKnobVariant_Tick)) {
-                for (int i = 0; i < nVoices; ++i) {
-                    voices[i]->setFegDecay(feg.decayTime);
-                }
-            }
-            if (ImGuiKnobs::Knob("Sustain", &feg.sustainLevel, 0.0f, 1.0f, 0.001f, "%.2f", ImGuiKnobVariant_Tick)) {
-                for (int i = 0; i < nVoices; ++i) {
-                    voices[i]->setFegSustain(feg.sustainLevel);
-                }
-            }
-            if (ImGuiKnobs::Knob("Release", &feg.releaseTime, 0.001f, 5.0f, 0.001f, "%.3fs", ImGuiKnobVariant_Tick)) {
-                for (int i = 0; i < nVoices; ++i) {
-                    voices[i]->setFegRelease(feg.releaseTime);
-                }
-            }
-        ImGui::End();
-
-        ImGui::SetNextWindowPos(ImVec2(190, 10));
-        ImGui::SetNextWindowSize(ImVec2(80, 480));
-        ImGui::Begin("OSC", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoTitleBar);
-            static float osc1detune = 1.0f;
-            static float osc2detune = 1.0f;
-            if (ImGuiKnobs::Knob("Osc 1 tune", &osc1detune, 1.0/1.05946f, 1.05946f, 0.0001f, "%.3f", ImGuiKnobVariant_Tick)) {
-                for (int i = 0; i < nVoices; ++i) {
-                    voices[i]->setOscDetune(1, osc1detune);
-                }
-            }
-            if (ImGuiKnobs::Knob("Osc 2 tune", &osc2detune, 1.0/1.05946f, 1.05946f, 0.0001f, "%.3f", ImGuiKnobVariant_Tick)) {
-                for (int i = 0; i < nVoices; ++i) {
-                    voices[i]->setOscDetune(2, osc2detune);
-                }
-            }
-        ImGui::End();
-
-
-
-        ImGui::SetNextWindowPos(ImVec2(280, 10));
-        // ImGui::SetNextWindowSize(ImVec2(80, 480));
-        ImGui::Begin("Filter", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoTitleBar);
-            static float cutoff = 1000.0f;
-            static float resonance = 0.0f;
-            static float fegAmount = 0.0f;
-            if (ImGuiKnobs::Knob("Cutoff", &cutoff, 0.1f, 1000.0f, 0.1f, "%.1f", ImGuiKnobVariant_Tick)) {
-                for (int i = 0; i < nVoices; ++i) {
-                    voices[i]->setCutoff(cutoff);
-                }
-            }
-            if (ImGuiKnobs::Knob("Resonance", &resonance, 0.1f, 10.0f, 0.001f, "%.3f", ImGuiKnobVariant_Tick)) {
-                for (int i = 0; i < nVoices; ++i) {
-                    voices[i]->setResonance(resonance);
-                }
-            }
-            if (ImGuiKnobs::Knob("FEG Amount", &fegAmount, 0.0f, 1000.0f, 0.1f, "%.2f", ImGuiKnobVariant_Tick)) {
-                for (int i = 0; i < nVoices; ++i) {
-                    voices[i]->setFegAmount(fegAmount);
-                }
-            }
-        ImGui::End();
-
-
-        ImGui::SetNextWindowPos(ImVec2(460, 10));
-        ImGui::SetNextWindowSize(ImVec2(100, 100));
-        ImGui::Begin("Toggle", nullptr, ImGuiWindowFlags_NoBackground);
-            static bool toggle_value = false;
-            if (ToggleSwitch("Toggle1", &toggle_value))
-            {
-                for (int i = 0; i < nVoices; ++i) {
-                    voices[i]->toggleOscWaveform(1, toggle_value);
-                }
-            }
-
-            static bool toggle_value2 = false;
-            if (ToggleSwitch("Toggle2", &toggle_value2))
-            {
-                for (int i = 0; i < nVoices; ++i) {
-                    voices[i]->toggleOscWaveform(2, toggle_value2);
-                }
-            }
-        ImGui::End();
+        // Render UI elements
+        renderAEG(voices, nVoices);
+        renderFEG(voices, nVoices);
+        renderOscSection(voices, nVoices);
+        renderFilterSection(voices, nVoices);
 
         // Rendering
         ImGui::Render();
-        glViewport(0, 0, 1280, 720);
+        // glViewport(0, 0, 1280, 720);
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-        SDL_GL_SwapWindow(window);
+        SDL_GL_SwapWindow(sdlContext.window);
     }
 
     // Cleanup
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL2_Shutdown();
     ImGui::DestroyContext();
-    SDL_GL_DeleteContext(gl_context);
-    SDL_DestroyWindow(window);
+    SDL_GL_DeleteContext(sdlContext.glContext);
+    SDL_DestroyWindow(sdlContext.window);
     SDL_Quit();
 
     return 0;
 }
 
 void audioThread(Voice* voices[], int nVoices) {
-    Stk::setSampleRate( SAMPLERATE );
-
+    Stk::setSampleRate(SAMPLERATE);
     RtWvOut *dac = 0;
 
     try {
@@ -266,9 +257,9 @@ void audioThread(Voice* voices[], int nVoices) {
         try {
             double outputSample = 0;
             for (int i = 0; i < nVoices; ++i) {
-                outputSample += voices[i]->tick();
+                outputSample += voices[i]->tick() / nVoices;
             }
-            dac->tick(outputSample / nVoices);
+            dac->tick(outputSample);
         }
         catch ( StkError & ) {
             break;
@@ -281,24 +272,19 @@ void audioThread(Voice* voices[], int nVoices) {
 
 int main()
 {
-    Voice *voice1 = new Voice(SAMPLERATE);
-    // Voice *voice2 = new Voice;
-    // Voice *voice3 = new Voice;
-    // Voice *voice4 = new Voice;
-
-    // Voice* voices[] = {voice1, voice2, voice3, voice4};
+    Voice* voice1 = new Voice(SAMPLERATE);
     Voice* voices[] = {voice1};
-    std::thread t1(audioThread, voices, sizeof(voices)/sizeof(voices[0]));
-    std::thread t2(guiThread, voices, sizeof(voices)/sizeof(voices[0]));
 
-    t2.join();
+    std::thread audio(audioThread, voices, sizeof(voices)/sizeof(voices[0]));
+    std::thread gui(guiThread, voices, sizeof(voices)/sizeof(voices[0]));
+
+    gui.join();
     running.store(false);
-    t1.join();
+    audio.join();
 
-    delete voice1;
-    // delete voice2;
-    // delete voice3;
-    // delete voice4;
+    for (Voice* voice : voices) {
+        delete voice;
+    }
 
     return 0;
 }
