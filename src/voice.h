@@ -38,6 +38,7 @@ public:
     void setFegRelease(float value);
 
     void setOscDetune(int osc, float value);
+    void toggleOscWaveform(int osc, bool value);
 
     void setCutoff(float value);
     void setResonance(float value);

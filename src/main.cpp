@@ -8,6 +8,8 @@
 #include "imgui/backends/imgui_impl_sdl2.h"
 #include "imgui/backends/imgui_impl_opengl3.h"
 #include "imgui-knobs/imgui-knobs.h"
+#include "toggleSwitch.h"
+
 #include "voice.h"
 #include "colors.h"
 #include "synthParameters.h"
@@ -20,7 +22,7 @@
 #include <condition_variable>
 
 
-const double SAMPLERATE = 44100.0;
+const double SAMPLERATE = 48000.0;
 const int BUFFER_FRAMES = 64;
 
 std::atomic<bool> running(true); // flag that is shared across threads
@@ -137,8 +139,6 @@ int guiThread(Voice* voices[], int nVoices) {
         ImGui::SetNextWindowPos(ImVec2(100, 10));
         ImGui::SetNextWindowSize(ImVec2(80, 480));
 
-        // ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));  // Transparent background
-
         ImGui::Begin("FEG", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoTitleBar);
             static adsrParameters feg = {0.001, 1.0, 1.0, 1.0};
             if (ImGuiKnobs::Knob("FEG\n\nAttack", &feg.attackTime, 0.001f, 5.0f, 0.001f, "%.3fs", ImGuiKnobVariant_Tick)) {
@@ -163,9 +163,6 @@ int guiThread(Voice* voices[], int nVoices) {
             }
         ImGui::End();
 
-        // ImGui::PopStyleColor(); // Restore the previous style color
-
-
         ImGui::SetNextWindowPos(ImVec2(190, 10));
         ImGui::SetNextWindowSize(ImVec2(80, 480));
         ImGui::Begin("OSC", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoTitleBar);
@@ -184,9 +181,10 @@ int guiThread(Voice* voices[], int nVoices) {
         ImGui::End();
 
 
+
         ImGui::SetNextWindowPos(ImVec2(280, 10));
-        ImGui::SetNextWindowSize(ImVec2(80, 480));
-        ImGui::Begin("Filter", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoTitleBar);
+        // ImGui::SetNextWindowSize(ImVec2(80, 480));
+        ImGui::Begin("Filter", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoTitleBar);
             static float cutoff = 1000.0f;
             static float resonance = 0.0f;
             static float fegAmount = 0.0f;
@@ -208,6 +206,25 @@ int guiThread(Voice* voices[], int nVoices) {
         ImGui::End();
 
 
+        ImGui::SetNextWindowPos(ImVec2(460, 10));
+        ImGui::SetNextWindowSize(ImVec2(100, 100));
+        ImGui::Begin("Toggle", nullptr, ImGuiWindowFlags_NoBackground);
+            static bool toggle_value = false;
+            if (ToggleSwitch("Toggle1", &toggle_value))
+            {
+                for (int i = 0; i < nVoices; ++i) {
+                    voices[i]->toggleOscWaveform(1, toggle_value);
+                }
+            }
+
+            static bool toggle_value2 = false;
+            if (ToggleSwitch("Toggle2", &toggle_value2))
+            {
+                for (int i = 0; i < nVoices; ++i) {
+                    voices[i]->toggleOscWaveform(2, toggle_value2);
+                }
+            }
+        ImGui::End();
 
         // Rendering
         ImGui::Render();

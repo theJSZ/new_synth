@@ -73,6 +73,14 @@ void Voice::setOscDetune(int osc, float value) {
         osc2->setDetune(value);
     }
 }
+void Voice::toggleOscWaveform(int osc, bool value) {
+    if (osc == 1) {
+        osc1->switchWave();
+    }
+    if (osc == 2) {
+        osc2->switchWave();
+    }
+}
 
 
 // FILTER
