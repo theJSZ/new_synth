@@ -16,7 +16,7 @@ private:
     std::unique_ptr<Oscillator> osc2;
     float osc1volume = 1.0f;
     float osc2volume = 1.0f;
-    float xModAmount = 0.0f;
+    float xModVolume = 0.0f;
 
     std::unique_ptr<OberheimVariationMoog> filter;
     std::unique_ptr<stk::ADSR> aeg;
@@ -47,10 +47,11 @@ public:
     void setXModAmount(float value);
     void toggleOscWaveform(int osc, bool value);
 
-
     void setCutoff(float value);
     void setResonance(float value);
     void setFegAmount(float value);
+
+    void setXModVolume(float value);
 };
 
 #endif

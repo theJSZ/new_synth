@@ -34,10 +34,10 @@ void voiceAllocator::noteOn(float frequency) {
 
 void voiceAllocator::noteOff(float frequency) {
     for (int i = 0; i < nVoices && i < 8; ++i) {
-        // if (notes[i] == frequency) {
+        if (notes[i] == frequency) {
             voices[i]->noteOff();
             voiceInUse[i] = false;
-        // }
+        }
     }
 }
 

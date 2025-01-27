@@ -21,6 +21,7 @@ private:
     float baseFrequency;
     float detune;
     void updateFrequency();
+    float xModAmount;
 public:
     Oscillator();
     ~Oscillator();

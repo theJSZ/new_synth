@@ -20,7 +20,10 @@ Voice::Voice(float samplerate)
 }
 
 double Voice::tick() {
-    float sample = (osc1->tick() * osc1volume + osc2->tick() * osc2volume) / 2;
+    float osc1sample = osc1->tick();
+    float osc2sample = osc2->tick();
+    float sample = (osc1sample * osc1volume + osc2sample * osc2volume) / 2;
+    sample += (osc1sample * osc2sample) * xModVolume;
     filter->SetCutoff(baseCutoff + (feg->tick() * fegAmount));
     filter->Process(&sample, 1);
     return (double) sample * aeg->tick();
@@ -36,6 +39,10 @@ void Voice::noteOff() {
     feg->keyOff();
 }
 
+void Voice::setXModVolume(float value) {
+    xModVolume = value;
+    std::cout << xModVolume << "\n";
+}
 
 // AEG
 void Voice::setAegAttack(float value) {
@@ -88,11 +95,11 @@ void Voice::toggleOscWaveform(int osc, bool value) {
 
 // FILTER
 void Voice::setCutoff(float value) {
-    baseCutoff = value;
+    baseCutoff = value*2;
 }
 void Voice::setResonance(float value) {
     filter->SetResonance(value);
 }
 void Voice::setFegAmount(float value) {
-    fegAmount = value;
+    fegAmount = value*2;
 }

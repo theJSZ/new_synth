@@ -25,7 +25,7 @@
 
 
 const double SAMPLERATE = 48000.0;
-const int BUFFER_FRAMES = 64;
+const int BUFFER_FRAMES = 512;
 const int WINDOW_WIDTH = 800;
 const int WINDOW_HEIGHT = 600;
 
@@ -146,9 +146,9 @@ void renderUi(Voice* voices[], int nVoices) {
     createKnob("Osc2 volume", &osc2volume, 0.0f, 1.0f, 0.001f, "%.3f", [&](float v) {
         for (int i = 0; i < nVoices; ++i) voices[i]->setOscVolume(2, v);
     });
-    ImGui::SetCursorPos(ImVec2(282, 161));
+    ImGui::SetCursorPos(ImVec2(341, 140));
     createKnob("xmod amount", &xModAmount, 0.0f, 1.0f, 0.001f, "%.3f", [&](float v) {
-        for (int i = 0; i < nVoices; ++i) voices[i]->setOscVolume(2, v);
+        for (int i = 0; i < nVoices; ++i) voices[i]->setXModVolume(v);
     });
     // FILTER SECTION
     static float cutoff = 1000.0f;
@@ -269,10 +269,6 @@ int guiThread(Voice* voices[], int nVoices, voiceAllocator* allocator) {
         style.Colors[ImGuiCol_Button] = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
 
         renderUi(voices, nVoices);
-        // renderAEG(voices, nVoices);
-        // renderFEG(voices, nVoices);
-        // renderOscSection(voices, nVoices);
-        // renderFilterSection(voices, nVoices);
 
         // Rendering
         ImGui::Render();
@@ -304,6 +300,8 @@ void audioThread(Voice* voices[], int nVoices) {
     catch ( StkError & ) {
         exit( 1 );
     }
+
+
 
     for (int i = 0; i < nVoices; ++i) {
         voices[i]->setFrequency(110.0 * (i+1));
@@ -350,6 +348,8 @@ int main()
     for (Voice* voice : voices) {
         delete voice;
     }
+    delete reader;
+    delete allocator;
 
     return 0;
 }
