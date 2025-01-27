@@ -1,9 +1,16 @@
 #include "midiReader.h"
 
-static std::queue<std::pair<int, std::pair<int,int>>> messagebuffer;
+static std::queue<std::pair<int, int>> messagebuffer;
 
+float midiNoteToHz(int midiNote) {
+    /* fm =  2^((m−69)/12) * (440 Hz)
+        where m is the MIDI note number
+    */
+   return pow(2, ((float) midiNote-69) / 12.0f) * 440;
+}
 
 static void midiCallback(double deltatime, std::vector<unsigned char>* bytes, void* userdata) {
+    auto allocator = (voiceAllocator*) userdata;
     // Called when a message is received
     if (bytes->size() < 2) return;
     if (bytes->at(0) > 239) return;    // Message type 240 and up are system messages
@@ -21,35 +28,42 @@ static void midiCallback(double deltatime, std::vector<unsigned char>* bytes, vo
     // Bytes 2 and 3 are data bytes.
     long databyte1 = bytes->at(1);  // databyte 1 is note number
     long databyte2 = bytes->at(2);  // databyte 2 is velocity
-    // long databyte2 = 0;
+    if (databyte2 == 0) type = __SK_NoteOff_;
+    if (type == __SK_NoteOn_) allocator->noteOn(midiNoteToHz(databyte1));
+    if (type == __SK_NoteOff_) allocator->noteOff(midiNoteToHz(databyte1));
+    // {1, notenumber} for note on
+    // {0, notenumber} for note off
 
+    // long databyte2 = 0;
     // if ((type != 0xC0) && (type != 0xD0)) { // 0xC0 is Program Change, 0xD0 is aftertouch
     //                                         // they only have one data byte
     //     if (bytes->size() < 3) return;
     //     databyte2 = bytes->at(2);
     // }
 
-    std::string typeName;
-    switch(type){
-        case __SK_NoteOn_:
-            typeName = "Note on\t";
-        case __SK_NoteOff_:
-            typeName = "Note off\t";
+    // std::string typeName;
+    // switch(type){
+    //     case __SK_NoteOn_:
+    //         std::cout << "note on" << std::endl;
+    //         typeName = "Note on\t";
+    //     case __SK_NoteOff_:
+    //         std::cout << "note off" << std::endl;
+    //         typeName = "Note off\t";
 
-        case __SK_ControlChange_:
-            typeName = "ControlChange\t";
-            break;
-        default:
-            typeName = "Unknown\t";
-    }
+    //     case __SK_ControlChange_:
+    //         typeName = "ControlChange\t";
+    //         break;
+    //     default:
+    //         typeName = "Unknown\t";
+    // }
 
-    if (type == 0xB0) { // 0xB0 = 0b10110000 = Control Change
-        if (typeName == "ControlChange\t") { // should always be true at this point?
-            messagebuffer.push({channel, {databyte1, databyte2}});
-        }
-    } else {
-        std::cout << "unknown" << std::endl;
-    }
+    // if (type == 0xB0) { // 0xB0 = 0b10110000 = Control Change
+    //     if (typeName == "ControlChange\t") { // should always be true at this point?
+    //         messagebuffer.push({channel, {databyte1, databyte2}});
+    //     }
+    // } else {
+    //     std::cout << "unknown" << std::endl;
+    // }
 
 }
 
@@ -63,7 +77,7 @@ MidiReader::MidiReader(voiceAllocator* allocator) {
         e.printMessage();
     }
 
-    midi_in->setCallback(&midiCallback);
+    midi_in->setCallback(&midiCallback, allocator);
     midi_in->ignoreTypes(true, true, true); // ignore SysEx, timing and active sense
 
     std::cout << "Scanning available MIDI devices" << std::endl;
@@ -101,9 +115,11 @@ void MidiReader::pollMidiEvents() {
 
 }
 
-float MidiReader::midiNoteToHz(int midiNote) {
-    /* fm =  2^((m−69)/12) * (440 Hz)
-        where m is the MIDI note number
-    */
-   return pow(2, ((float) midiNote-69) / 12.0f) * 440;
+
+
+std::pair<int, int> MidiReader::Read() {
+    if (messagebuffer.size() == 0) return {-1, -1};
+    std::pair<int, int> message = messagebuffer.front();
+    messagebuffer.pop();
+    return message;
 }

@@ -11,6 +11,8 @@ public:
     MidiReader(voiceAllocator* allocator);
     ~MidiReader();
     void pollMidiEvents();
+    std::pair<int, int> Read();
+
 private:
     float midiNoteToHz(int midiNote);
     RtMidiIn *midi_in;
