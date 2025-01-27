@@ -6,7 +6,7 @@ ifeq ($(PLATFORM), linux)
 	CXX = g++
 	CXXFLAGS = -std=c++14 -pthread -Wall -D__OS_LINUX__ -Iimgui -Iimgui/backends -ISDL2 -fsanitize=address
 # Libraries
-	LIBS = -ldl -lstk -lpthread -lSDL2 -lGLEW -lGL
+	LIBS = -ldl -lstk -lpthread -lSDL2 -lGLEW -lGL -lrtmidi
 # Output executable
 	TARGET = new_synth
 else ifeq ($(PLATFORM), windows)
@@ -21,7 +21,7 @@ else
 endif
 
 # Source files
-SOURCES = main.cpp voice.cpp imgui/*.cpp imgui/backends/imgui_impl_sdl2.cpp imgui/backends/imgui_impl_opengl3.cpp imgui-knobs/imgui-knobs.cpp oscillator.cpp voiceAllocator.cpp
+SOURCES = main.cpp voice.cpp imgui/*.cpp imgui/backends/imgui_impl_sdl2.cpp imgui/backends/imgui_impl_opengl3.cpp imgui-knobs/imgui-knobs.cpp oscillator.cpp voiceAllocator.cpp midiReader.cpp
 
 
 # Build target

@@ -20,7 +20,7 @@ Voice::Voice(float samplerate)
 }
 
 double Voice::tick() {
-    float sample = (osc1->tick() + osc2->tick()) / 2;
+    float sample = (osc1->tick() * osc1volume + osc2->tick() * osc2volume) / 2;
     filter->SetCutoff(baseCutoff + (feg->tick() * fegAmount));
     filter->Process(&sample, 1);
     return (double) sample * aeg->tick();
@@ -72,6 +72,9 @@ void Voice::setOscDetune(int osc, float value) {
     } else if (osc == 2) {
         osc2->setDetune(value);
     }
+}
+void Voice::setOscVolume(int osc, float value) {
+    (osc == 1) ? osc1volume = value : osc2volume = value;
 }
 void Voice::toggleOscWaveform(int osc, bool value) {
     if (osc == 1) {

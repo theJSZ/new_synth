@@ -14,11 +14,16 @@ class Voice
 private:
     std::unique_ptr<Oscillator> osc1;
     std::unique_ptr<Oscillator> osc2;
+    float osc1volume = 1.0f;
+    float osc2volume = 1.0f;
+    float xModAmount = 0.0f;
+
     std::unique_ptr<OberheimVariationMoog> filter;
     std::unique_ptr<stk::ADSR> aeg;
     std::unique_ptr<stk::ADSR> feg;
     float fegAmount;
     float baseCutoff;
+
 public:
     Voice(float samplerate);
     ~Voice() = default;
@@ -38,7 +43,10 @@ public:
     void setFegRelease(float value);
 
     void setOscDetune(int osc, float value);
+    void setOscVolume(int osc, float value);
+    void setXModAmount(float value);
     void toggleOscWaveform(int osc, bool value);
+
 
     void setCutoff(float value);
     void setResonance(float value);
